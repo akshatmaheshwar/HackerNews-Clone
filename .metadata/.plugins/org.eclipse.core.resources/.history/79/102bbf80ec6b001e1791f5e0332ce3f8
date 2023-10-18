@@ -1,0 +1,28 @@
+package com.example.newest;
+
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+@WebServlet("/casdbnewest")
+public class CasDBNewestServlet extends HttpServlet {
+	private static final long serialVersionUID = 1L;
+       
+    public CasDBNewestServlet() {
+        super();
+    }
+    
+	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		response.getWriter().append("Served at: ").append(request.getContextPath());
+	}
+	
+	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		CassandraDBConnect connector = new CassandraDBConnect();
+		connector.connectdb("localhost", 9042);
+		connector.getSession().execute("INSERT INTO hacker_news_posts (id,descendants,posted_by,score,time,title,type,url) VALUES (3785468,0,'akshat',2,16974567209,'Lossless Cut: The Swiss army knife of lossless video/audio editing','story','https://github.com/mifi/lossless-cut');");
+		response.sendRedirect("dbnewest");
+	}
+
+}

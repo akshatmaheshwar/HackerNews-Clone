@@ -1,0 +1,9 @@
+INDEX VERSION 1.4+D:\Akshat codes\zoho\HackerNews\.metadata\.plugins\org.eclipse.wst.jsdt.core\indexes
+1159361749.index
+1326274511.index
+2610431357.index
+1159361749.index
+3344372361.index
+3152886102.index
+2116664758.index
+4079205679.index

@@ -1,0 +1,17 @@
+package com.example.newest;
+
+import org.quartz.Job;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
+import java.util.Date;
+
+public class UpdateDB implements Job{
+
+	@Override
+	public void execute(JobExecutionContext arg0) throws JobExecutionException {
+		
+		System.out.println("This is a scheduled task");
+		System.out.println("Time is "+ new Date());
+	}
+	
+}
