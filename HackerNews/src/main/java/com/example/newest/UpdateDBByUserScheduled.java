@@ -1,0 +1,187 @@
+package com.example.newest;
+
+import java.io.OutputStream;
+import java.math.BigDecimal;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Scanner;
+
+import javax.net.ssl.HttpsURLConnection;
+
+import org.quartz.Job;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
+
+import com.datastax.driver.core.PreparedStatement;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+public class UpdateDBByUserScheduled implements Job{
+	@Override
+	public void execute(JobExecutionContext context) throws JobExecutionException {
+		String user = context.getJobDetail().getJobDataMap().getString("user");
+		try {
+			URL urlObj = new URL("https://hacker-news.firebaseio.com/v0/newstories.json?print=pretty");
+			HttpsURLConnection connection = (HttpsURLConnection) urlObj.openConnection();
+			connection.setRequestMethod("GET");
+			int responseCode = connection.getResponseCode();
+			
+			if(responseCode == HttpsURLConnection.HTTP_OK) {
+				StringBuilder sb = new StringBuilder();
+				Scanner sc = new Scanner(connection.getInputStream());
+				
+				while(sc.hasNext())sb.append(sc.nextLine());
+				sc.close();
+				
+				ObjectMapper om = new ObjectMapper();
+				@SuppressWarnings("unchecked")
+				List<Integer> jsonArr = om.readValue(sb.toString(),List.class);
+				List<Posts> postList = new ArrayList<Posts>();
+				
+				for(int i=0;i<30;i++) {
+					URL urlObj1 = new URL("https://hacker-news.firebaseio.com/v0/item/"+jsonArr.get(i)+".json?print=pretty");
+					HttpsURLConnection connection1 = (HttpsURLConnection) urlObj1.openConnection();
+					connection1.setRequestMethod("GET");
+					int responseCode1 = connection1.getResponseCode();
+					
+					if(responseCode1 == HttpsURLConnection.HTTP_OK) {
+						StringBuilder sb1 = new StringBuilder();
+						Scanner sc1 = new Scanner(connection1.getInputStream());
+						
+						while(sc1.hasNext())sb1.append(sc1.nextLine());
+						sc1.close();
+						
+						try{
+							Posts post = om.readValue(sb1.toString(),Posts.class);
+							postList.add(post);
+						}catch(Exception e) {
+							System.out.println(e);
+						}
+					}
+				}
+				
+				CassandraDBConnect connector = new CassandraDBConnect();
+				connector.connectdb("localhost", 9042);
+				PreparedStatement pst = connector.getSession().prepare("INSERT INTO hacker_news_post_by_user (user,id,descendants,first_comment,posted_by,score,text,time,title,type,url) VALUES (?,?,?,?,?,?,?,?,?,?,?);");
+				PreparedStatement pst1 = connector.getSession().prepare("INSERT INTO hacker_news_post_by_time (date,id,descendants,first_comment,posted_by,score,text,time,title,type,url) VALUES (?,?,?,?,?,?,?,?,?,?,?);");
+				for(Posts post : postList) {
+					int id =  post.getId();
+					int descendants = post.getDescendants();
+					String posted_by = post.getBy();
+					int score = post.getScore();
+					String text = post.getText();
+					long time = post.getTime();
+					String first_comment = null;
+					if(post.getKids()!=null&&post.getKids().size()!=0) {
+						URL urlObj1 = new URL("https://hacker-news.firebaseio.com/v0/item/"+post.getKids().get(0)+".json?print=pretty");
+						HttpsURLConnection connection1 = (HttpsURLConnection) urlObj1.openConnection();
+						connection1.setRequestMethod("GET");
+						int responseCode1 = connection1.getResponseCode();
+						
+						if(responseCode1 == HttpsURLConnection.HTTP_OK) {
+							StringBuilder sb1 = new StringBuilder();
+							Scanner sc1 = new Scanner(connection1.getInputStream());
+							
+							while(sc1.hasNext())sb1.append(sc1.nextLine());
+							sc1.close();
+							
+							try{
+								Comments comment = om.readValue(sb1.toString(),Comments.class);
+								first_comment = comment.getText();
+								if(first_comment!=null&&first_comment.toLowerCase().contains("leetcode")) {
+									try {
+							            URL webHookUrlObj = new URL("https://webhook.site/552157ca-4009-4a8f-a35a-f09165e13052");
+							            HttpURLConnection webHookConnection = (HttpURLConnection) webHookUrlObj.openConnection();
+							            webHookConnection.setRequestMethod("POST");
+							            webHookConnection.setDoOutput(true);
+							            String payload = om.writeValueAsString(comment);
+							            try (OutputStream os = webHookConnection.getOutputStream()) {
+							                os.write(payload.getBytes());
+							                os.flush();
+							            }
+							            int webHookResponseCode = webHookConnection.getResponseCode();
+							            System.out.println("Webhook response code: " + webHookResponseCode);
+							            webHookConnection.disconnect();
+							        } catch (Exception e) {
+							            e.printStackTrace();
+							        }
+								}
+							}catch(Exception e) {
+								System.out.println(e);
+							}
+						}
+					}
+					String title = post.getTitle();
+					String type = post.getType();
+					String url = post.getUrl();
+					String date = new SimpleDateFormat("dd-MM-yyyy").format(new Date(time*1000));
+					connector.getSession().execute(pst1.bind(date,id, descendants,first_comment, posted_by, score, text, time, title, type, url));
+					connector.getSession().execute(pst.bind(user,id, descendants,first_comment, posted_by, score, text, time, title, type, url));
+				}
+				ArrayList<long[]> commentIds = new ArrayList<long[]>();
+				for(int i=0;i<postList.size();i++) {
+					if(postList.get(i).getKids()!=null) {
+						for(int j=0;j<postList.get(i).getKids().size();j++) {
+							long[] arr = new long[2];
+//							arr[0] = new SimpleDateFormat("dd-MM-yyyy").format(new Date(postList.get(i).getTime()*1000));
+							arr[0] = postList.get(i).getTime();
+							arr[1] = postList.get(i).getKids().get(j);
+							commentIds.add(arr);
+						}
+					}
+				}
+				ArrayList<Comments> commentList = new ArrayList<Comments>();
+				for(int i=0;i<commentIds.size();i++) {
+					URL urlObj1 = new URL("https://hacker-news.firebaseio.com/v0/item/"+commentIds.get(i)[1]+".json?print=pretty");
+					HttpsURLConnection connection1 = (HttpsURLConnection) urlObj1.openConnection();
+					connection1.setRequestMethod("GET");
+					int responseCode1 = connection1.getResponseCode();
+					if(responseCode1 == HttpsURLConnection.HTTP_OK) {
+						StringBuilder sb1 = new StringBuilder();
+						Scanner sc1 = new Scanner(connection1.getInputStream());
+						while(sc1.hasNext())sb1.append(sc1.nextLine());
+						sc1.close();
+						ObjectMapper om1 = new ObjectMapper();
+						try{
+							Comments comment = om1.readValue(sb1.toString(),Comments.class);
+							comment.setPostTime(commentIds.get(i)[0]);
+							commentList.add(comment);
+						}catch(Exception e) {
+							System.out.println(e);
+						}
+					}
+				}
+//				for(int i=0;i<commentList.size();i++)System.out.println(commentList.get(i).getText().toString());
+				try {
+				    Class.forName("com.mysql.cj.jdbc.Driver");
+				} catch (ClassNotFoundException e) {
+				    e.printStackTrace();
+				}
+				try(Connection con = DriverManager.getConnection("jdbc:mysql://localhost:3306/HackerNews","root","root")){
+					try(java.sql.PreparedStatement cpst = con.prepareStatement("INSERT IGNORE INTO HackerNewsComments(id,posted_by,parent_id,text,time,type,post_time) values(?,?,?,?,?,?,?)")){
+						for(Comments comment : commentList) {
+							cpst.setInt(1, comment.getId());
+							cpst.setString(2, comment.getBy());
+							cpst.setInt(3, comment.getParent());
+							cpst.setString(4, comment.getText());
+							cpst.setBigDecimal(5, new BigDecimal(comment.getTime()));
+							cpst.setString(6, comment.getType());
+							cpst.setLong(7, comment.getPostTime());
+							cpst.executeUpdate();
+						}
+						System.out.println("Updated DB successfully!");
+					}catch(Exception e) {e.printStackTrace();}
+				}catch(Exception e) {e.printStackTrace();}
+				System.out.println("Updated Cassandra DB for " +user+" successfully at "+new Date() +"!");
+			}
+		}
+		catch(Exception e) {
+			e.printStackTrace();
+		}
+	}
+}

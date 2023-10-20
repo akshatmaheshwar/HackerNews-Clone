@@ -10,9 +10,13 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
+import com.datastax.driver.core.PreparedStatement;
+import com.datastax.driver.core.Row;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -45,8 +49,8 @@ public class PostComments extends HttpServlet {
 	    		post.setTitle(rs.getString("title"));
 	    		post.setType(rs.getString("type"));
 	    		post.setUrl(rs.getString("url"));
+	    		request.setAttribute("post", post);
 	    	}
-    		request.setAttribute("post", post);
 	    }catch(Exception e) {
 	    	System.out.println(e);
 	    }
@@ -56,10 +60,10 @@ public class PostComments extends HttpServlet {
 		} catch (ClassNotFoundException e) {
 			e.printStackTrace();
 		}
+    	List<Comments> commentList = new ArrayList<Comments>();
 	    try(Connection con = DriverManager.getConnection("jdbc:mysql://localhost:3306/HackerNews","root","root")){
 	    	Statement st = con.createStatement();
 	    	ResultSet rs = st.executeQuery("SELECT * FROM HackerNewsComments WHERE parent_id = " + postId +" ORDER BY time DESC");
-	    	List<Comments> commentList = new ArrayList<Comments>();
 	    	while(rs.next()) {
 	    		Comments comment = new Comments();
 	    		ArrayList<Integer> kidsId = new ArrayList<>();
@@ -77,11 +81,34 @@ public class PostComments extends HttpServlet {
 	    		comment.setParent(rs.getInt("parent_id"));
 	    		comment.setText(rs.getString("text"));
 	    		comment.setTime(rs.getLong("time"));
+	    		comment.setPostTime(rs.getLong("post_time"));
 	    		comment.setType(rs.getString("type"));
 	    		commentList.add(comment);
 	    	}
 	    	request.setAttribute("commentList", commentList);
 	    }catch(Exception e) {e.printStackTrace();}
+	    if(request.getAttribute("post")==null) {
+			CassandraDBConnect connector = new CassandraDBConnect();
+			connector.connectdb("localhost", 9042);
+			
+			com.datastax.driver.core.ResultSet resultSet = connector.getSession().execute("SELECT * FROM hacker_news_post_by_time WHERE date = '"+ 
+			new SimpleDateFormat("dd-MM-yyyy").format(new Date(commentList.get(0).getPostTime()*1000))+"' AND time = "+ commentList.get(0).getPostTime() + " AND id = "+commentList.get(0).getParent()+";");
+			System.out.println("SELECT * FROM hacker_news_post_by_time WHERE date = '"+
+			new SimpleDateFormat("dd-MM-yyyy").format(new Date(commentList.get(0).getPostTime()*1000))+"' AND time = "+ commentList.get(0).getPostTime() + " AND id = "+commentList.get(0).getParent()+";");
+			Posts post = new Posts();
+			for(Row rs : resultSet) {
+				post.setId(rs.getInt("id"));
+	    		post.setBy(rs.getString("posted_by"));
+	    		post.setDescendants(rs.getInt("descendants"));
+	    		post.setScore(rs.getInt("score"));
+	    		post.setText(rs.getString("text"));
+	    		post.setTime(rs.getLong("time"));
+	    		post.setTitle(rs.getString("title"));
+	    		post.setType(rs.getString("type"));
+	    		post.setUrl(rs.getString("url"));
+			}
+			request.setAttribute("post", post);
+	    }
 		request.getRequestDispatcher("/comments.jsp").forward(request, response);
 			
 	}

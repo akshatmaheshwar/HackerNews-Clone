@@ -68,14 +68,20 @@ long getMidNight(int n){
 	return c.getTimeInMillis()/1000;
 }
 %>
-<h4> <a href ="newest">new</a>&nbsp;|&nbsp;<a href ="dbnewest">new from MySql DB</a>&nbsp;|&nbsp;<a href ="casdbnewest">new from Cassandra DB</a>&nbsp;|&nbsp;<a href ="">past</a>&nbsp;|&nbsp;<a href ="">comments</a>&nbsp;|&nbsp;<a href ="">ask</a>&nbsp;|&nbsp;<a href ="">show</a>&nbsp;|&nbsp;<a href ="">jobs</a>&nbsp;|&nbsp;<a href ="">submit</a></h4>
 <% int startNo = 1;
 int dateNav = 0;
+String user = null;
 if(request.getAttribute("pagination")!=null)startNo = (int)request.getAttribute("pagination")-29;
-if(request.getAttribute("datenav")!=null)dateNav = (int)request.getAttribute("datenav");%>
+if(request.getAttribute("datenav")!=null)dateNav = (int)request.getAttribute("datenav");
+if(request.getAttribute("user")!=null) user = (String)request.getAttribute("user");%>
+<h4> <a href ="newest">new</a>&nbsp;|&nbsp;<a href ="dbnewest">new from MySql DB</a>&nbsp;|&nbsp;<a href ="casdbnewest">new from Cassandra DB</a>&nbsp;|&nbsp;&nbsp;|&nbsp;<a href ="casdbbasedonuser">new user specific</a>&nbsp;|&nbsp;<a href ="">past</a>&nbsp;|&nbsp;<a href ="">comments</a>&nbsp;|&nbsp;<a href ="">ask</a>&nbsp;|&nbsp;<a href ="">show</a>&nbsp;|&nbsp;<a href ="">jobs</a>&nbsp;|&nbsp;<a href ="">submit</a></h4>
+
 	<div style="display: flex;">
 	<form action="dbnewest" method="post"><input type="submit" value="Update MySql DB manually"></form> &nbsp; &nbsp;
 	<form action="casdbnewest" method="post"><input type="submit" value="Update Cassandra DB manually"></form> &nbsp; &nbsp;
+	<form action="casdbbasedonuser" method="post"><input type="submit" value="Update for user manually"></form> &nbsp; &nbsp;
+	<form action="scheduleddbupdatebyuser" method="post"><input type="submit" value="Start Scheduled task for user"></form> &nbsp; &nbsp;
+	<form action="stopscheduleddbupdatebyuser" method="post"><input type="submit" value="stop Scheduled task for user"></form> &nbsp; &nbsp;
 	<form action="scheduledservlet" method="post">
         Scheduled DB update (in minutes): <input type="text" name="intervalMinutes" required>
         <input type="submit" value="Start">

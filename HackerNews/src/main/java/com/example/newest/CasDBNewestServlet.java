@@ -38,6 +38,7 @@ public class CasDBNewestServlet extends HttpServlet {
 		long fromTime = 0;
 		long toTime = System.currentTimeMillis()/1000;
 		int dateNav = 0;
+		String user = (String)request.getSession().getAttribute("user");
 		if(request.getParameter("fromtime")!=null) {
 			fromTime = Long.parseLong(request.getParameter("fromtime"));
 			request.setAttribute("fromtime", fromTime);		
@@ -63,9 +64,26 @@ public class CasDBNewestServlet extends HttpServlet {
         calendar.add(Calendar.DAY_OF_MONTH, 1);
 		List<Posts> postList = new ArrayList<Posts>();
 		if(fromTime!=0) {
-		do {
+			if(user!=null) {
+				ResultSet resultSet = connector.getSession().execute("SELECT * FROM hacker_news_post_by_user WHERE user = '"+ user +"' AND time >= "+fromTime+" AND time <= "+ toTime+";");
+		    	for(Row rs : resultSet) {
+		    		Posts post = new Posts();
+		    		post.setId(rs.getInt("id"));
+		    		post.setBy(rs.getString("posted_by"));
+		    		post.setDescendants(rs.getInt("descendants"));
+		    		post.setScore(rs.getInt("score"));
+		    		post.setText(rs.getString("text"));
+		    		post.setTime(rs.getLong("time"));
+		    		post.setTitle(rs.getString("title"));
+		    		post.setType(rs.getString("type"));
+		    		post.setUrl(rs.getString("url"));
+		    		postList.add(post);
+		    	}
+			}
+			else do {
 			calendar.add(Calendar.DAY_OF_MONTH, -1);
-			StringBuilder queryString = new StringBuilder("SELECT * FROM hacker_news_post_by_time WHERE date = '" + sdf.format(calendar.getTime())+ "'");
+			StringBuilder queryString = new StringBuilder();
+			queryString.append("SELECT * FROM hacker_news_post_by_time WHERE date = '" + sdf.format(calendar.getTime())+ "'");
 			if(sdf.format(calendar.getTime()).equals(fromDate)) queryString.append(" AND time >= " + fromTime);
 			if(sdf.format(calendar.getTime()).equals(toDate)) queryString.append(" AND time <= " + toTime);
 			queryString.append(";");
@@ -85,7 +103,7 @@ public class CasDBNewestServlet extends HttpServlet {
 	    		postList.add(post);
 	    	}
 		}while(!sdf.format(calendar.getTime()).equals(fromDate));
-		}
+	}
 		else {
 			ResultSet resultSet = connector.getSession().execute("SELECT * FROM hacker_news_post_by_time;");
 	    	for(Row rs : resultSet) {
@@ -146,7 +164,7 @@ public class CasDBNewestServlet extends HttpServlet {
 					}
 				}
 			}
-			List<Posts> postsWithText = new ArrayList<Posts>();
+//			List<Posts> postsWithText = new ArrayList<Posts>();
 			CassandraDBConnect connector = new CassandraDBConnect();
 			connector.connectdb("localhost", 9042);
 			PreparedStatement pst = connector.getSession().prepare("INSERT INTO hacker_news_post_by_time (id,descendants,first_comment,posted_by,score,text,time,date,title,type,url) VALUES (?,?,?,?,?,?,?,?,?,?,?);");
@@ -202,7 +220,7 @@ public class CasDBNewestServlet extends HttpServlet {
 				String type = post.getType();
 				String url = post.getUrl();
 				connector.getSession().execute(pst.bind(id, descendants,first_comment, posted_by, score, text, time,formattedDate, title, type, url));
-				if(text!=null)postsWithText.add(post);
+//				if(text!=null)postsWithText.add(post);
 			}
 			System.out.println("Updated Cassandra DB successfully!");
 			response.sendRedirect("casdbnewest");

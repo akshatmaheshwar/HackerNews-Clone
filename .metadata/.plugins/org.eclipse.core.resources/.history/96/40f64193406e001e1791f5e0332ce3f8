@@ -1,0 +1,22 @@
+package com.example.newest;
+
+import java.util.Date;
+
+import org.quartz.Job;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
+
+public class UpdateDBByUserScheduled implements Job{
+	String user = null;
+	public String getUser() {
+		return user;
+	}
+	public void setUser(String user) {
+		this.user = user;
+	}
+	@Override
+	public void execute(JobExecutionContext arg0) throws JobExecutionException {
+		System.out.println("Username "+user+ "executed at " +new Date());
+	}
+	
+}

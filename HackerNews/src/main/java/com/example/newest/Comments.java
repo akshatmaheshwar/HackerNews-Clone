@@ -6,20 +6,30 @@ public class Comments {
 	String by;
 	int id;
 	ArrayList<Integer> kids;
+	boolean deleted;
 	int parent;
 	String text;
+	long post_time;
 	long time;
 	String type;
 	public Comments(){}
-	public Comments(String by, int id, ArrayList<Integer> kids, int parent, String text, long time, String type) {
+	public Comments(String by, int id, ArrayList<Integer> kids,long post_time, boolean deleted, int parent, String text, long time, String type) {
 		super();
 		this.by = by;
 		this.id = id;
+		this.post_time = post_time;
 		this.kids = kids;
+		this.deleted = deleted;
 		this.parent = parent;
 		this.text = text;
 		this.time = time;
 		this.type = type;
+	}
+	public long getPostTime() {
+		return post_time;
+	}
+	public void setPostTime(long post_time) {
+		this.post_time = post_time;
 	}
 	public String getBy() {
 		return by;
@@ -38,6 +48,12 @@ public class Comments {
 	}
 	public void setKids(ArrayList<Integer> kids) {
 		this.kids = kids;
+	}
+	public boolean isDeleted() {
+		return deleted;
+	}
+	public void setDeleted(boolean deleted) {
+		this.deleted = deleted;
 	}
 	public int getParent() {
 		return parent;
